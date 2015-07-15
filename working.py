@@ -44,6 +44,10 @@ for col in train.columns:
         lbl.fit(list(train[col]) + list(test[col]))
         train[col] = lbl.transform(train[col])
         test[col] = lbl.transform(test[col])
+ohc = preprocessing.OneHotEncoder()
+train = ohc.fit_transform(train)
+test = ohc.transform(test)
+
 model = SGDRegressor()
 model.fit(train, y)
 
