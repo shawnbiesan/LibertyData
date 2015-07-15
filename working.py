@@ -7,6 +7,7 @@ from sklearn import preprocessing
 from sklearn.linear_model import SGDRegressor
 from sklearn import decomposition, pipeline, metrics, grid_search
 from sklearn.svm import SVR
+from sklearn.decomposition import TruncatedSVD
 
 # normalized gini by 0x0FFF
 def gini(solution, submission):
@@ -47,6 +48,10 @@ for col in train.columns:
 ohc = preprocessing.OneHotEncoder()
 train = ohc.fit_transform(train)
 test = ohc.transform(test)
+
+svd = TruncatedSVD(n_components=500, random_state=42)
+train = svd.fit_transform(train)
+test = svd.transform(test)
 
 model = SGDRegressor()
 model.fit(train, y)
