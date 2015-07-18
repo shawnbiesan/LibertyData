@@ -14,13 +14,13 @@ from sklearn.ensemble import GradientBoostingRegressor, RandomForestRegressor
 from sklearn.metrics import make_scorer
 from sklearn import grid_search
 from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
+import xgboost as xgb
 
 class CustomPipeline(object):
     @classmethod
     def get_pipeline(cls):
         pipe_clf = Pipeline([
-        ('svd', TruncatedSVD(n_components=200)),
+        #('svd', TruncatedSVD(n_components=200)),
         ('mod', SGDRegressor())
         #('svr', RandomForestRegressor(n_estimators=10, n_jobs=-1))
         ])
@@ -29,7 +29,7 @@ class CustomPipeline(object):
     @classmethod
     def get_pipeline_svr(cls):
         pipe_clf = Pipeline([
-        ('svd', TruncatedSVD(n_components=200)),
+        #('svd', TruncatedSVD(n_components=200)),
         ('mod', LinearSVR(C=1, epsilon=.01))
         ])
         return pipe_clf    
@@ -37,8 +37,10 @@ class CustomPipeline(object):
     @classmethod
     def get_pipeline_tree(cls):
         pipe_clf = Pipeline([
-        ('svd', TruncatedSVD(n_components=100)),
-        ('mod', RandomForestRegressor(n_estimators=100, n_jobs=-1))
+        #('svd', TruncatedSVD(n_components=200)),
+        #('mod', GradientBoostingRegressor(n_estimators=300))
+        ('mod', xgb.XGBRegressor(n_estimators=300, min_child_weight=8,
+                                 subsample=.5, max_depth=3, learning_rate=.111)),
         ])
         return pipe_clf
 
@@ -77,11 +79,11 @@ def get_optimal_params(df, y, p, clf):
     df = df[0:int(df.shape[0] * p)]
     y = y[0:int(y.shape[0] * p)]
     gini_scorer = make_scorer(Gini)
-    params = {#'mod__alpha': [1, .01, .001, .0001],
-              'mod__loss': ['squared_epsilon_insensitive',
-                            'epsilon_insensitive'],
-              'mod__epsilon': [.1, 0, .01],
-              #'mod__penalty': ['l2', 'l1', 'elasticnet']
+    params = {
+                'mod__max_depth': [6, 7,],
+                'mod__min_child_weight': [1, 3],
+                'mod__subsample': [.5, .8, 1],
+                #'mod__eta': [.03, .01],
               }
     model = grid_search.GridSearchCV(estimator=clf,
                                      param_grid=params,
@@ -155,26 +157,26 @@ if __name__ == '__main__':
             train[col] = lbl.transform(train[col])
             test[col] = lbl.transform(test[col])
     ohc = preprocessing.OneHotEncoder()
-    train = ohc.fit_transform(train)
-    test = ohc.transform(test)
+    train_hot = ohc.fit_transform(train)
+    test_hot = ohc.transform(test)
     
     ########
     #get_optimal_params(train, y, .75, CustomPipeline.get_pipeline_tree())
 
    # validate_model_func(train, y, .75)
     
-    model1 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline())
+    model1 = test_model_holdout(train_hot, y, .75, CustomPipeline.get_pipeline())
     model2 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline_tree())
-    
-    stacked_predictions_train = pd.concat([pd.DataFrame(model1.predict(train),columns=['model1']),
-                           pd.DataFrame(model2.predict(train),columns=['model2'])],
-                            axis=1)
+    model3 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline_svr())
+
+    model_list = [model1, model2, model3]
+
+    stacked_predictions_train = pd.concat([pd.DataFrame(model.predict(train)) for i, model in enumerate(model_list) if i != 0 else ], axis=1)
     stacked_model = test_model_holdout(stacked_predictions_train, y, .75, LinearRegression())
     
-    stacked_predictions_test = pd.concat([pd.DataFrame(model1.predict(test),columns=['model1']),
-                           pd.DataFrame(model2.predict(test),columns=['model2'])],
-                            axis=1)
+    stacked_predictions_test = pd.concat([pd.DataFrame(model.predict(test)) for model in model_list], axis=1)
             
-    
-    result.Hazard = stacked_model.predict(stacked_predictions_test)
+
+    #result.Hazard = stacked_model.predict(stacked_predictions_test)
+    result.Hazard = model2.predict(test)
     result.to_csv('output.csv', index=False)
