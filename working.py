@@ -16,6 +16,10 @@ from sklearn import grid_search
 from sklearn.manifold import TSNE
 import xgboost as xgb
 
+one_hot_columns = ['T1_V4', 'T1_V5', 'T1_V6', 'T1_V7', 'T1_V8',
+                   'T2_V11', 'T2_V12', 'T2_V13', 'T1_V9', 'T1_V11', 'T1_V12',
+                   'T1_V15', 'T1_V16', 'T1_V17']
+
 class CustomPipeline(object):
     @classmethod
     def get_pipeline(cls):
@@ -156,7 +160,7 @@ if __name__ == '__main__':
             lbl.fit(list(train[col]) + list(test[col]))
             train[col] = lbl.transform(train[col])
             test[col] = lbl.transform(test[col])
-    ohc = preprocessing.OneHotEncoder()
+    ohc = preprocessing.OneHotEncoder(sparse=False)
     train_hot = ohc.fit_transform(train)
     test_hot = ohc.transform(test)
     
@@ -169,16 +173,24 @@ if __name__ == '__main__':
     ## actually be ordinal
     model1 = test_model_holdout(train_hot, y, .75, CustomPipeline.get_pipeline())
     model2 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline_tree())
-    model3 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline_svr())
+    model3 = test_model_holdout(train_hot, y, .75, CustomPipeline.get_pipeline_svr())
 
     model_list = [model1, model2, model3]
 
-    stacked_predictions_train = pd.concat([pd.DataFrame(model.predict(train)) for i, model in enumerate(model_list) if i != 0 else ], axis=1)
+    #stacked_predictions_train = pd.concat([pd.DataFrame(model.predict(train)) for i, model in enumerate(model_list) if i != 0 else ], axis=1)
+    stacked_predictions_train = pd.concat([pd.DataFrame(model1.predict(train_hot)),
+                                 pd.DataFrame(model2.predict(train)),
+                                 pd.DataFrame(model3.predict(train_hot)),
+                                ], axis=1)
     stacked_model = test_model_holdout(stacked_predictions_train, y, .75, LinearRegression())
     
-    stacked_predictions_test = pd.concat([pd.DataFrame(model.predict(test)) for model in model_list], axis=1)
+   # stacked_predictions_test = pd.concat([pd.DataFrame(model.predict(test)) for model in model_list], axis=1)
+    stacked_predictions_test = pd.concat([pd.DataFrame(model1.predict(test_hot)),
+                                 pd.DataFrame(model2.predict(test)),
+                                 pd.DataFrame(model3.predict(test_hot)),
+                                ], axis=1)
             
 
-    #result.Hazard = stacked_model.predict(stacked_predictions_test)
-    result.Hazard = model2.predict(test)
+    result.Hazard = stacked_model.predict(stacked_predictions_test)
+    #result.Hazard = model2.predict(test)
     result.to_csv('output.csv', index=False)
