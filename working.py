@@ -164,7 +164,9 @@ if __name__ == '__main__':
     #get_optimal_params(train, y, .75, CustomPipeline.get_pipeline_tree())
 
    # validate_model_func(train, y, .75)
-    
+
+    ## todo, allow model 1 to use diff data, and also in general look at which ones should
+    ## actually be ordinal
     model1 = test_model_holdout(train_hot, y, .75, CustomPipeline.get_pipeline())
     model2 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline_tree())
     model3 = test_model_holdout(train, y, .75, CustomPipeline.get_pipeline_svr())
